@@ -471,6 +471,6 @@ If ($NuspecFile) {
     Write-Output "Nuspec file created - '$NuspecFile'."
     Write-Output "Done. "
 } else {
-    Write-Error "Failed to create Nuspec file."
+    Write-Error "Failed to create Nuspec file. Error: $_"
 }
 #endregion

@@ -1,11 +1,9 @@
 Describe 'Module manifest' {
 
     BeforeAll {
-        $moduleName         = $env:BHProjectName
-        $outputDir          = Join-Path -Path $ENV:BHProjectPath -ChildPath 'Output'
-        $outputModDir       = Join-Path -Path $outputDir -ChildPath $env:BHProjectName
-        $outputManifestPath = Join-Path -Path $outputModDir -Child "$($moduleName).psd1"
-        $changelogPath      = Join-Path -Path $env:BHProjectPath -Child 'CHANGELOG.md'
+        $moduleProjectPath = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
+        $moduleName        = (Get-Item $moduleProjectPath).BaseName
+        $changelogPath     = Join-Path -Path $moduleProjectPath -Child 'CHANGELOG.md'
     }
     Context 'Validation' {
         BeforeAll {
@@ -15,7 +13,7 @@ Describe 'Module manifest' {
                     break
                 }
             }
-            $manifest = Test-ModuleManifest -Path $outputManifestPath -ErrorAction Ignore -WarningAction Ignore
+            $manifest = Test-ModuleManifest -Path "$moduleProjectPath\dist\*\*.psd1" -ErrorAction Ignore -WarningAction Ignore
         }
 
         It 'has a valid manifest' {
@@ -23,11 +21,11 @@ Describe 'Module manifest' {
         }
 
         It 'has a valid name in the manifest' {
-            $manifest.Name | Should -Be $env:BHProjectName
+            $manifest.Name | Should -Be $moduleName
         }
 
         It 'has a valid root module' {
-            $manifest.RootModule | Should -Be "$($moduleName).psm1"
+            $manifest.RootModule | Should -Be "$moduleName"
         }
 
         It 'has a valid version in the manifest' {

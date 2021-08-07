@@ -1,36 +1,27 @@
-Describe 'Text files formatting' {
+BeforeDiscovery {
+    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'MetaFixers.psm1') -Verbose:$false -Force
+    $moduleProjectPath = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
+    $moduleName = (get-item $moduleProjectPath).BaseName
+    $allTextFiles = Get-TextFilesList $moduleProjectPath -Exclude '_build_dependencies_', "$moduleName\\Modules", '\\build\\'
+}
 
-    BeforeAll {
-        # Make sure MetaFixers.psm1 is loaded - it contains Get-TextFilesList
-        Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'MetaFixers.psm1') -Verbose:$false -Force
+Describe 'Text file formatting - <_>' -ForEach $allTextFiles {
 
-        $allTextFiles = Get-TextFilesList $ENV:BHProjectPath -Exclude '_build_dependencies_', 'Modules'
-    }
-
-    Context 'Files encoding' {
-        It "Doesn't use Unicode encoding" {
-            $unicodeFilesCount = 0
-            $allTextFiles | Foreach-Object {
-                if (Test-FileUnicode $_) {
-                    $unicodeFilesCount += 1
-                    Write-Warning "File $($_.FullName) contains 0x00 bytes. It's probably uses Unicode and need to be converted to UTF-8. Use Fixer 'Get-UnicodeFilesList `$pwd | ConvertTo-UTF8'."
-                }
-            }
-            $unicodeFilesCount | Should -Be 0
+    It "Doesn't use Unicode encoding" {
+        if ($unicode = Test-FileUnicode $_) {
+            Write-Warning "File $($_.FullName) contains 0x00 bytes. It's probably uses Unicode and need to be converted to UTF-8. Use Fixer 'Get-UnicodeFilesList `$pwd | ConvertTo-UTF8'."
         }
+        $unicode | Should -Be $false
+    }
+    It 'Uses spaces for indentation, not tabs' {
+        $fileName = $_.FullName
+        if ($tabs = (Get-Content $fileName) | Select-String "`t") {
+            Write-Warning "There are tabs in $fileName. Use Fixer 'Get-TextFilesList `$pwd | ConvertTo-SpaceIndentation'."
+            $tabs.LineNumber | ForEach-Object {
+                Write-Warning "Found tab(s) on line $_"
+            }
+        }
+        $tabs.Count | Should -Be 0
     }
 
-    Context 'Indentations' {
-        It 'Uses spaces for indentation, not tabs' {
-            $totalTabsCount = 0
-            $allTextFiles | Foreach-Object {
-                $fileName = $_.FullName
-                (Get-Content $_.FullName -Raw) | Select-String "`t" | Foreach-Object {
-                    Write-Warning "There are tab in $fileName. Use Fixer 'Get-TextFilesList `$pwd | ConvertTo-SpaceIndentation'."
-                    $totalTabsCount++
-                }
-            }
-            $totalTabsCount | Should -Be 0
-        }
-    }
 }

@@ -5,7 +5,6 @@
 #>
 
 $ErrorActionPreference = 'stop'
-Set-StrictMode -Version latest
 
 function ConvertTo-UTF8() {
     [CmdletBinding()]
