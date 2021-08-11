@@ -44,7 +44,8 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: test-results
-          path: build\*.xml
+          path: build/*.xml
+          if-no-files-found: error
   publish:
     # Only publish when we are running against the master branch
     if: ${{ github.ref == 'refs/heads/master' }}
@@ -62,4 +63,4 @@ jobs:
         env:
           NUGET_KEY: ${{ secrets.NUGET_KEY }}
         shell: pwsh
-        run: ./build.ps1 -Task Publish
+        run: .\build.ps1 -Task Publish
