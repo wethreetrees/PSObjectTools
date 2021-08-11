@@ -475,7 +475,7 @@ Task Pester Build, {
 
     if ($Script:Coverage) {
         $configuration.CodeCoverage.Enabled               = $true
-        $configuration.CodeCoverage.Path                  = 'S:\Documents\Projects\PowerShell\PSObjectTools\dist\PSObjectTools\public'
+        $configuration.CodeCoverage.Path                  = $coveragePaths
         $configuration.CodeCoverage.OutputFormat          = 'JaCoCo'
         $configuration.CodeCoverage.OutputPath            = "$Script:Build\coverage.xml"
         $configuration.CodeCoverage.CoveragePercentTarget = $MinimumCoverage
