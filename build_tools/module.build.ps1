@@ -139,7 +139,7 @@ Enter-Build {
         $Script:ModuleTests
         $Script:CommonTests
     )
-    $Script:Imports = ('public', 'private', 'Scripts')
+    $Script:Imports = ('Public', 'Private', 'Scripts')
     $Script:Classes = (Get-ChildItem -Path "$Script:Source\Classes" -ErrorAction SilentlyContinue).Name
     $Script:NeedsPublished = $false
     $Script:IsPromotion = $false
@@ -255,7 +255,7 @@ Task BuildPSM1 {
     }
 
     [void]$StringBuilder.AppendLine("")
-    [void]$StringBuilder.AppendLine("`$publicFunctions = (Get-ChildItem -Path `"`$PSScriptRoot\public`" -Filter '*.ps1').BaseName")
+    [void]$StringBuilder.AppendLine("`$publicFunctions = (Get-ChildItem -Path `"`$PSScriptRoot\Public`" -Filter '*.ps1').BaseName")
     [void]$StringBuilder.AppendLine("")
     [void]$StringBuilder.AppendLine("Export-ModuleMember -Function `$publicFunctions")
 
@@ -276,7 +276,7 @@ Task BuildPSD1 {
     if ($dlls) { Update-Metadata -Path $Script:ManifestPath -PropertyName RequiredAssemblies -Value $dlls }
 
     Write-Output "  Setting Module Functions"
-    $moduleFunctions = Get-ChildItem -Path "$Script:Source\public" -Filter '*.ps1' | Select-Object -ExpandProperty BaseName
+    $moduleFunctions = Get-ChildItem -Path "$Script:Source\Public" -Filter '*.ps1' | Select-Object -ExpandProperty BaseName
     Update-Metadata -Path $Script:ManifestPath -Property FunctionsToExport -Value $moduleFunctions
 
     Write-Output "  Setting ProjectUri"
@@ -442,6 +442,10 @@ Task Test Pester
 Task Pester {
     if (-not (Test-Path -Path $Script:Destination)) {
         throw "You must run the 'Build' task before running the test suite!`nTry this: .\build.ps1 -Task Build, Test`n Or this: .\build.ps1"
+    }
+
+    if (-not (Test-Path -Path $Script:Build)) {
+        New-Item -Type Directory -Path $Script:Build -ErrorAction SilentlyContinue | Out-Null
     }
 
     Write-Output "  Setting up test dependencies"

@@ -18,14 +18,14 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v2
-      - name: Perform a Pester test from the Tests.ps1 file
+      - name: Build module
         shell: pwsh
         run: .\build.ps1 -Task Build
       - name: Upload build artifact
         uses: actions/upload-artifact@v2
         with:
           name: dist
-          path: dist
+          path: dist/*
   test:
     needs: build
     runs-on: ubuntu-latest
@@ -36,6 +36,7 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: dist
+          path: dist
       - name: Test with Pester
         shell: pwsh
         run: .\build.ps1 -Task Test -Coverage 
@@ -43,7 +44,8 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: test-results
-          path: build\testResults.xml
+          path: build/*.xml
+          if-no-files-found: error
   publish:
     # Only publish when we are running against the master branch
     if: ${{ github.ref == 'refs/heads/master' }}
@@ -56,8 +58,9 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: dist
+          path: dist
       - name: Publish to PSGallery
         env:
           NUGET_KEY: ${{ secrets.NUGET_KEY }}
         shell: pwsh
-        run: ./build.ps1 -Task Publish
+        run: .\build.ps1 -Task Publish

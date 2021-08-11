@@ -44,10 +44,10 @@ BeforeDiscovery {
 Describe "Compare-PSObject Unit Tests" {
 
     BeforeAll {
-        $ModuleRoot = "$PSScriptRoot\..\.."
-        if (Test-Path -Path $ModuleRoot\dist) {
-            Import-Module $ModuleRoot\dist\PSObjectTools -Force
-            Import-Module $ModuleRoot\build_tools\tests\TestHelpers -DisableNameChecking -Force
+        $ModuleRoot = "$PSScriptRoot/../.."
+        if (Test-Path -Path $ModuleRoot/dist) {
+            Import-Module $ModuleRoot/dist/PSObjectTools -Force
+            Import-Module $ModuleRoot/build_tools/tests/TestHelpers -DisableNameChecking -Force
         } else {
             Write-Warning "Testing locally, importing function directly..."
             . $ModuleRoot\src\Public\Format-PSObject.ps1
