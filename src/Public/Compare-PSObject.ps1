@@ -24,14 +24,19 @@
     .PARAMETER Depth
         The recursive limit for nested object property values
 
-    .PARAMETER IgnorePropery
-        An array of property names to skip formatting
+    .PARAMETER IgnoreProperty
+        An array of property names to skip during comparison
 
     .PARAMETER IncludeEqual
         Include matching properties in the returned dataset
 
     .PARAMETER ExcludeDifferent
         Exclude differing properties in the returned dataset
+
+    .EXAMPLE
+        Compare-PSObject -ReferenceObject @{value1 = 'testvalue'} -DifferenceObject @{value1 = 'testvalue'}
+
+        Perform a simple object comparison between two matching objects.
 #>
 function Compare-PSObject {
     [CmdletBinding()]

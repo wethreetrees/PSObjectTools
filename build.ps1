@@ -1,26 +1,13 @@
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = 'Default')]
 Param (
     [Parameter()]
     $Task = 'Default',
 
-    [Parameter()]
-    [ValidateSet('Patch', 'Minor', 'Major')]
-    $VersionIncrement,
-
-    [Parameter()]
+    [Parameter(Mandatory, ParameterSetName = 'Coverage')]
     [switch]$Coverage,
 
-    [Parameter()]
-    [string]$PatToken,
-
-    [Parameter()]
-    [switch]$PreRelease,
-
-    [Parameter()]
-    [switch]$ValidateCoverage,
-
-    [Parameter()]
-    [string]$RepoName,
+    [Parameter(ParameterSetName = 'Coverage')]
+    [double]$MinimumCoverage = 70,
 
     [Parameter()]
     [switch]$Help
@@ -50,14 +37,19 @@ process {
     # Writing out the current script parameters for troubleshooting logs
     $params = @{}
     foreach($h in $MyInvocation.MyCommand.Parameters.GetEnumerator()) {
-        try {
-            $key = $h.Key
-            $val = Get-Variable -Name $key -ErrorAction Stop | Select-Object -ExpandProperty Value -ErrorAction Stop
-            if (([String]::IsNullOrEmpty($val) -and (-not $PSBoundParameters.ContainsKey($key)))) {
-                throw "A blank value that wasn't supplied by the user."
-            }
-            $params[$key] = $val
-        } catch {}
+        if (
+            ($PSCmdlet.ParameterSetName -in $h.Value.ParameterSets.Keys) -or
+            ('__AllParameterSets' -in $h.Value.ParameterSets.Keys)
+        ) {
+            try {
+                $key = $h.Key
+                $val = Get-Variable -Name $key -ErrorAction Stop | Select-Object -ExpandProperty Value -ErrorAction Stop
+                if (([String]::IsNullOrEmpty($val) -and (-not $PSBoundParameters.ContainsKey($key)))) {
+                    throw "A blank value that wasn't supplied by the user."
+                }
+                $params[$key] = $val
+            } catch {}
+        }
     }
     if ($params.Keys) {
         Write-Output "Build Parameters:`n$($params | Out-String)"
@@ -105,12 +97,8 @@ process {
             File             = $buildFile
             Task             = $Task
             ModuleName       = $ModuleName
-            VersionIncrement = $VersionIncrement
             Coverage         = $Coverage
-            PatToken         = $PatToken
-            PreRelease       = $PreRelease
-            ValidateCoverage = $ValidateCoverage
-            RepoName         = $RepoName
+            MinimumCoverage  = $MinimumCoverage
             Verbose          = $VerbosePreference
         }
         Invoke-Build @InvokeBuildParams

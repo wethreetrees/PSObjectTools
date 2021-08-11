@@ -44,26 +44,14 @@ BeforeDiscovery {
 Describe "Compare-PSObject Unit Tests" {
 
     BeforeAll {
-        if (Test-Path -Path $PSScriptRoot\..\dist) {
+        # if (Test-Path -Path $PSScriptRoot\..\dist) {
             Import-Module $PSScriptRoot\..\dist\PSObjectTools -Force
-        } else {
-            Write-Warning "Testing locally, importing function directly..."
-            . $PSScriptRoot\..\src\Public\Format-PSObject.ps1
-            . $PSScriptRoot\..\src\Public\Compare-PSObject.ps1
-        }
-
-        Function Should-BeObject {
-            Param (
-                [Parameter(Position=0)]
-                [Object[]]$b,
-
-                [Parameter(ValueFromPipeLine = $True)]
-                [Object[]]$a
-            )
-            $Property = ($a | Select-Object -First 1).PSObject.Properties | Select-Object -Expand Name
-            $Difference = Compare-Object $b $a -Property $Property
-            $Difference | Select-Object -First 1 | Should -BeNull
-        }
+            Import-Module $PSScriptRoot\..\build_tools\tests\TestHelpers -DisableNameChecking -Force
+        # } else {
+        #     Write-Warning "Testing locally, importing function directly..."
+        #     . $PSScriptRoot\..\src\Public\Format-PSObject.ps1
+        #     . $PSScriptRoot\..\src\Public\Compare-PSObject.ps1
+        # }
     }
 
     Context "Parameter Tests" {
@@ -112,7 +100,7 @@ Describe "Compare-PSObject Unit Tests" {
 
         It "Should return differences" -TestCases $baseDifferenceTestCases {
             $result = Compare-PSObject -ReferenceObject $ReferenceObject -DifferenceObject $DifferenceObject
-            $result | Should-BeObject $ExpectedValue
+            $result | Should -BeObject $ExpectedValue
         }
 
     }

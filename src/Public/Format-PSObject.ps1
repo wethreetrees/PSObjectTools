@@ -22,6 +22,11 @@
     .PARAMETER CurrentDepth
         For internal use
 
+    .EXAMPLE
+        Format-PSObject -InputObject @{value1 = 'testvalue'; value2 = @{nestedValue = 'nested'}}
+
+        Create a property mapping of the 'InputObject' properties and their respective values
+
     .NOTES
         Adapted from https://www.red-gate.com/simple-talk/blogs/display-object-a-powershell-utility-cmdlet/
 #>
@@ -36,7 +41,7 @@ function Format-PSObject {
         [int]$Depth = 5,
 
         [Parameter()]
-        [object[]]$IgnoreProperty = @('#comment'),
+        [string[]]$IgnoreProperty,
 
         [Parameter(DontShow)]
         [string]$Parent = '$_',
@@ -45,13 +50,14 @@ function Format-PSObject {
         [int]$CurrentDepth = 0
     )
 
+    begin {
+        if ($CurrentDepth -eq 0) { $reachedDepthLimit = $false }
+    }
+
     process {
         if ($CurrentDepth -ge $Depth) {
             # Prevent runaway recursion
-            Write-Warning (
-                "Format-PSObject reached the depth limit [$Depth]. " +
-                'Use the -Depth parameter to increase the recursion limit.'
-            )
+            $Script:reachedDepthLimit = $true
         }
 
         if ($InputObject -eq $Null) {
@@ -75,8 +81,8 @@ function Format-PSObject {
                 $MemberType = 'Property'
             }
 
-            $InputObject |
-                Get-Member -MemberType $MemberType -Force |
+            if ($InputObject) {
+                Get-Member -InputObject $InputObject -MemberType $MemberType -Force |
                 Where-Object { $_.Name -notin $IgnoreProperty } |
                 ForEach-Object {
                     $property = $_
@@ -95,10 +101,7 @@ function Format-PSObject {
                     ) {
                         [pscustomobject]@{ 'Path' = "$Parent.$($property.Name)"; 'Value' = $Child }
                     } elseif (($CurrentDepth + 1) -eq $Depth) {
-                        Write-Warning (
-                            "Format-PSObject reached the depth limit [$Depth]. " +
-                            'Use the -Depth parameter to increase the recursion limit.'
-                        )
+                        $Script:reachedDepthLimit = $true
                         [pscustomobject]@{ 'Path' = "$Parent.$($property.Name)"; 'Value' = $Child }
                     } else {
                         $FormatPSObjectParams = @{
@@ -111,22 +114,20 @@ function Format-PSObject {
                         Format-PSObject @FormatPSObjectParams
                     }
                 }
+            }
         } else {
             0..($InputObject.Count - 1) | ForEach-Object {
                 $iterator = $_
                 $child = $InputObject[$iterator]
 
                 if (
-                    ($child -eq $null) -or #is the current child a value or a null?
+                    ($null -eq $child) -or #is the current child a value or a null?
                     ($child.GetType().BaseType.Name -eq 'ValueType') -or
                     ($child.GetType().Name -in @('String', 'String[]'))
                 ) {
                     [pscustomobject]@{ 'Path' = "$Parent[$iterator]"; 'Value' = "$($child)" }
                 } elseif (($CurrentDepth + 1) -eq $Depth) {
-                    Write-Warning (
-                        "Format-PSObject reached the depth limit [$Depth]. " +
-                        'Use the -Depth parameter to increase the recursion limit.'
-                    )
+                    $Script:reachedDepthLimit = $true
                     [pscustomobject]@{ 'Path' = "$Parent[$iterator]"; 'Value' = "$($child)" }
                 } else {
                     $FormatPSObjectParams = @{
@@ -139,6 +140,15 @@ function Format-PSObject {
                     Format-PSObject @FormatPSObjectParams
                 }
             }
+        }
+    }
+
+    end {
+        if ($CurrentDepth -eq 0 -and $reachedDepthLimit) {
+            Write-Warning (
+                "Format-PSObject reached the depth limit [$Depth]. " +
+                'Use the -Depth parameter to increase the recursion limit.'
+            )
         }
     }
 }

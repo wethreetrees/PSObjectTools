@@ -11,7 +11,7 @@ BeforeDiscovery {
     Import-Module $moduleProjectPath\dist\$ModuleName -ErrorAction Stop -Force
 
     # Setting up test cases
-    $commands = Get-Command -Module $ModuleName -CommandType Cmdlet, Function, Workflow  # Not alias
+    $commands = Get-Command -Module $ModuleName -CommandType Cmdlet, Function, Script  # Not alias
     $helpHash = @{}
     $documentationTestCases = $commands | ForEach-Object {
         $commandName = $_.Name

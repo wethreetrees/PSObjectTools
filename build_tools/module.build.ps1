@@ -1,22 +1,17 @@
-# Adapted from https://github.com/mcbobke/PlasterModuleTemplate
 Param(
     [string]$ModuleName,
-    [string]$VersionIncrement,
     [switch]$Coverage,
-    [string]$PatToken,
-    [switch]$Prerelease,
-    [switch]$ValidateCoverage,
-    [string]$RepoName
+    [double]$MinimumCoverage
 )
 
 # Synopsis: Runs full Build and Test process
 Task Default Build, Test
 
 # Synopsis: Run pipeline tasks
-Task Pipeline VerifyTriggeringBranch, PackageModule
+Task Pipeline PackageModule
 
 # Synopsis: Builds the [dist] directory and prepares the module for testing and publishing
-Task Build Clean, CopyDist, InstallModuleDependencies, GetReleasedModuleInfo, BuildPSM1, BuildPSD1
+Task Build Clean, CopyDist, GetReleasedModuleInfo, BuildPSM1, BuildPSD1
 
 # Synopsis: Runs a new build and imports the resulting module
 Task Import Build, {
@@ -27,68 +22,6 @@ Task Import Build, {
 }
 
 Enter-Build {
-    function GetPatTokenCreds {
-        param (
-            [string]$PatToken
-        )
-        $password = ConvertTo-SecureString -String $PatToken -AsPlainText -Force
-        New-Object System.Management.Automation.PSCredential ('DevOps', $password)
-    }
-
-    function Invoke-ADOWebRequest {
-        [CmdletBinding()]
-        param (
-            $Url,
-            $Body,
-            $PatToken,
-            $OutFile,
-            $Method='Get'
-        )
-        $authToken = [System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes(":$($PatToken)"))
-        $response = Invoke-RestMethod -Method $Method -Uri $Url -Headers @{Authorization = "Basic $authToken"; 'Content-Type' = 'application/json'} -Body $Body -OutFile $OutFile
-        if ($response -match 'Azure DevOps Services | Sign In') {
-            throw "Failed to login to Azure, check PAT token!"
-        } else {
-            if ($response.value) {
-                return $response.value
-            } else {
-                return $response
-            }
-        }
-    }
-
-    function GetPackageFeed ($Name, $PatToken) {
-        $url = "https://feeds.dev.azure.com/deloittegti/_apis/packaging/feeds/$($Name)?api-version6.0-preview.1"
-        Invoke-ADOWebRequest -Url $url -PatToken $PatToken
-    }
-
-    function GetAzureArtifactPackageInfo ($Name, $FeedID, [switch]$Latest, $PatToken) {
-        $queries = @()
-        $url = "https://feeds.dev.azure.com/deloittegti/_apis/packaging/Feeds/$($FeedID)/packages?"
-        $queries += "packageNameQuery=$Name"
-        $queries += "api-version=6.0-preview.1"
-
-        if (-not $Latest) { $queries += "includeAllVersions=true" }
-
-        $url += $queries -join '&'
-        $response = Invoke-ADOWebRequest -Url $url -PatToken $PatToken
-
-        return $response
-    }
-
-    function DownloadAzureArtifactPackage ($Name, $Version, $FeedID, $OutFile, $PatToken) {
-        $url = "https://pkgs.dev.azure.com/deloittegti/_apis/packaging/feeds/$FeedID/nuget/packages/$Name/versions/$Version/content?api-version=6.0-preview.1"
-        $response = Invoke-ADOWebRequest -Url $url -OutFile $OutFile -PatToken $PatToken
-        return $response
-    }
-
-    function ExtractAzureArtifactPackage ($File, $DestinationPath) {
-        Expand-Archive -Path $File -DestinationPath $DestinationPath -Force
-        Remove-Item -Path $DestinationPath\_rels -Recurse -Force
-        Remove-Item -Path $DestinationPath\package -Recurse -Force
-        Remove-Item -Path "$DestinationPath\*.xml" -Force
-        Remove-Item -Path "$DestinationPath\*.nuspec" -Force
-    }
 
     function GetPreviousRelease {
         [CmdletBinding()]
@@ -97,44 +30,15 @@ Enter-Build {
             [string]$Name,
 
             [Parameter(Mandatory)]
-            [string]$Repository,
-
-            [Parameter(Mandatory)]
-            [string]$Path,
-
-            [Parameter(Mandatory)]
-            [switch]$PreferRelease,
-
-            [Parameter()]
-            [string]$PatToken
+            [string]$Path
         )
 
         process {
             try {
-                $feed = GetPackageFeed -Name $Repository -PatToken $PatToken
-                $packageInfo = GetAzureArtifactPackageInfo -Name $Name -FeedID $feed.id -Latest -PatToken $PatToken
-                $latestVersionInfo = $packageInfo.versions
-                if ($PreferRelease -and $latestVersionInfo.version -like '*-prerelease') {
-                    $packageInfo = GetAzureArtifactPackageInfo -Name $Name -FeedID $feed.id -PatToken $PatToken
-                    $allVersions = $packageInfo.versions
-                    $releaseVersions = $allVersions | Where-Object { $_.version -notlike '*-prerelease' } | Sort-Object -Property version -Descending
-                    if ($releaseVersions) {
-                        $packageVersion = $releaseVersions | Select-Object -First 1
-                    } else {
-                        $packageVersion = $latestVersionInfo
-                    }
-                } else {
-                    $packageVersion = $latestVersionInfo
+                $module = Find-Module -Name $Name -Repository PSGallery -ErrorAction SilentlyContinue
+                if ($module) {
+                    $module | Save-Module -Path $Path -Force
                 }
-
-                if ($packageVersion) {
-                    $File = "$Path\$Name.zip"
-                    $Destination = "$Path\$Name"
-                    DownloadAzureArtifactPackage -FeedID $feed.id -Name $packageInfo.name -Version $packageVersion.version -OutFile $File -PatToken $PatToken
-                    ExtractAzureArtifactPackage -File $File -DestinationPath $Destination
-                }
-
-                return $packageVersion
             } catch {
                 $PSCmdlet.ThrowTerminatingError($_)
             }
@@ -182,35 +86,6 @@ Enter-Build {
         }
 
         $functions
-    }
-
-    function GetAzurePullRequest {
-        param (
-            $CommitHash,
-            $PatToken
-        )
-        # $url = "https://dev.azure.com/deloittegti/gti-automation/_apis/git/pullrequests/$($PullRequestId)?api-version=6.0"
-        # if ($Status) { $url += "&searchCriteria.status=$Status" }
-        # if ($TargetRefName) { $url += "&searchCriteria.targetRefName=$TargetRefName" }
-        $body = @"
-{
-    "queries": [{
-        "items": [
-            "$CommitHash"
-        ],
-        "type": "lastMergeCommit"
-    }]
-}
-"@
-        $url = 'https://dev.azure.com/deloittegti/gti-automation/_apis/git/repositories/d7b89b8b-3bc1-48f8-bf0d-fcd8978e96d2/pullrequestquery?api-version=6.1-preview.1'
-        $response = Invoke-ADOWebRequest -Method Post -Url $url -Body $body -PatToken $PatToken
-        return $response.results | Select-Object -ExpandProperty $CommitHash -ErrorAction SilentlyContinue
-    }
-
-    function GetPullRequestIdFromCommitMessage {
-        $commit = git show-branch --no-name HEAD
-        $prId = [regex]::Matches($commit, 'Merged PR (\d+):').groups | Select-Object -First 1 -Skip 1 -ExpandProperty Value
-        return $prId
     }
 
     function ComparePublicFunctionInterfaces {
@@ -269,11 +144,8 @@ Enter-Build {
     )
     $Script:Imports = ('public', 'private', 'Scripts')
     $Script:Classes = (Get-ChildItem -Path "$Script:Source\Classes" -ErrorAction SilentlyContinue).Name
-    $Script:minimumCoverage = 0.7
     $Script:NeedsPublished = $false
     $Script:IsPromotion = $false
-
-    $Script:PatTokenCreds = GetPatTokenCreds -PatToken $PatToken
 }
 
 # Synopsis: Remove any existing build files
@@ -302,38 +174,15 @@ Task CopyDist {
         ForEach-Object {"   Creating directory (recursive) [{0}]" -f $_.fullname.replace($PSScriptRoot, '')}
 }
 
-# Synopsis: Install the module dependencies (module.Depend.psd1) in the dist module directory
-Task InstallModuleDependencies {
-    Write-Output "  Installing module dependencies to [$Script:ModuleDependencies]"
-    $invokePSDependParams = @{
-        Path = "$Script:BuildTools\module.Depend.psd1"
-        Target = $Script:ModuleDependencies
-        Install = $true
-        Force   = $true
-        Credentials = @{
-            PatTokenCreds = $Script:PatTokenCreds
-        }
-    }
-    Invoke-PSDepend @invokePSDependParams -WarningAction SilentlyContinue -ErrorAction Stop
-}
-
 # Synopsis: Get the latest module release
 Task GetReleasedModuleInfo {
     if (-not (Test-Path $Script:ReleasedModulePath)) {
         $null = New-Item -Path $Script:ReleasedModulePath -ItemType Directory
     }
 
-    # This check is to allow pushing a bug fix directly into the master branch.
-    # That way we do not end up with weird versioning issues. The bugfix in master
-    # should be incremented based on the deployed master version, not any higher
-    # prerelease versions.
-    $preferRelease = -not $Prerelease -and -not $Script:IsPromotion
     $getPreviousReleaseParams = @{
         Name          = $Script:ModuleName
-        Repository    = $Script:RepoName
         Path          = $Script:ReleasedModulePath
-        PreferRelease = $preferRelease
-        PatToken      = $PatToken
     }
     $release = GetPreviousRelease @getPreviousReleaseParams
 
@@ -364,9 +213,9 @@ function GetPublicFunctionInterfaces {$function:GetPublicFunctionInterfaces}
     } else {
         Write-Warning (
             "No previous release found. If this is not a new module, follow the below steps:`n" +
-            "    - Check your PAT token permissions and expiration`n" +
+            "    - Check the PSGallery nuget key`n" +
             "    - Check your internet connection`n" +
-            "    - Check that the previous release artifact has not been delisted or deleted"
+            "    - Check that the previous release has not been delisted or deleted"
         )
     }
 }
@@ -564,16 +413,6 @@ function GetPublicFunctionInterfaces {$function:GetPublicFunctionInterfaces}
     $releasedVersion = $Script:releasedModuleInfo.Version
     $releaseIsPrerelease = $Script:releasedModuleInfo.Prerelease
 
-    if (-not $VersionIncrement) {
-        $VersionIncrement = $DetectedVersionIncrement
-    } else {
-        if ($DetectedVersionIncrement) {
-            Write-Output "  Manual version increment [$VersionIncrement] requested, ignoring detected version increment [$DetectedVersionIncrement]"
-        } else {
-            Write-Output "  Manual version increment [$VersionIncrement] requested"
-        }
-    }
-
     if ($version -gt $releasedVersion) {
         $Script:NeedsPublished = $true
         $relativeManifestPath = "$Script:Source\$Script:ModuleName.psd1" | Resolve-Path -Relative
@@ -600,12 +439,11 @@ function GetPublicFunctionInterfaces {$function:GetPublicFunctionInterfaces}
 }
 
 # Synopsis: Run the full build and test suite
-Task Test Build, Pester, CodeHealth, CheckCodeCoverage
+Task Test Build, Pester
 
 # Synopsis: Execute Pester tests
 Task Pester Build, {
     Write-Output "  Setting up test dependencies"
-    Remove-Module Pester -Force -ErrorAction SilentlyContinue
 
     if (-not (Invoke-PSDepend -Path "$Script:BuildTools\build.Depend.psd1" -Tags Test -Test -Quiet)) {
         Invoke-PSDepend -Path "$Script:BuildTools\build.Depend.psd1" -Tags Test -Install -Force
@@ -619,6 +457,13 @@ Task Pester Build, {
 
     Get-Module -All -Name $Script:ModuleName | Remove-Module -Force -ErrorAction SilentlyContinue
 
+    $coveragePaths = $Script:Imports | ForEach-Object {
+        $validatePath = "$Script:Destination\$_\*.ps1"
+        if (Get-ChildItem -Path $validatePath -ErrorAction SilentlyContinue) {
+            $validatePath
+        }
+    }
+
     Write-Output "  Setting up test configuration"
     $configuration                           = New-PesterConfiguration
     $configuration.Run.Path                  = @($Script:Tests)
@@ -630,10 +475,10 @@ Task Pester Build, {
 
     if ($Script:Coverage) {
         $configuration.CodeCoverage.Enabled               = $true
-        $configuration.CodeCoverage.Path                  = "$Script:Destination\Public\*.ps1", "$Script:Destination\Private\*.ps1"
+        $configuration.CodeCoverage.Path                  = 'S:\Documents\Projects\PowerShell\PSObjectTools\dist\PSObjectTools\public'
         $configuration.CodeCoverage.OutputFormat          = 'JaCoCo'
         $configuration.CodeCoverage.OutputPath            = "$Script:Build\coverage.xml"
-        $configuration.CodeCoverage.CoveragePercentTarget = $Script:minimumCoverage
+        $configuration.CodeCoverage.CoveragePercentTarget = $MinimumCoverage
     }
     Write-Output "  Starting Pester tests"
     $pesterResults = Invoke-Pester -Configuration $configuration -Verbose:$VerbosePreference
@@ -641,107 +486,9 @@ Task Pester Build, {
     Write-Output "  Tests completed, exporting Pester 5 results"
     $pesterResults | Export-Clixml -Path "$Script:Build\pester5Results.xml" -Encoding UTF8 -Depth 5
 
-    Write-Output "  Tests completed, exporting Pester 4 (converted) results"
-    $pesterResults | ConvertTo-Pester4Result | Export-Clixml -Path "$Script:Build\pester4Results.xml" -Encoding UTF8 -Depth 5
-
-    Remove-Module -Name Pester -Force -ErrorAction SilentlyContinue
-
     assert ($pesterResults) "There was a terminal error when executing the Pester tests."
-}
-
-# Synopsis: Execute PSCodeHealth checks
-Task CodeHealth -If {Get-Item -Path "$Script:Build\pester4Results.xml"} {
-    # Run CodeHealth in a job so we don't pollute the current session with Pester 4 import
-    $scriptBlock = {
-        Write-Output "  Setting up CodeHealth dependencies"
-
-        if (-not (Invoke-PSDepend -Path "$Using:BuildTools\build.Depend.psd1" -Tags CodeHealth -Test -Quiet)) {
-            Invoke-PSDepend -Path "$Using:BuildTools\build.Depend.psd1" -Tags CodeHealth -Install -Force
-        }
-        Invoke-PSDepend -Path "$Using:BuildTools\build.Depend.psd1" -Tags CodeHealth -Import -Force
-
-        $testResults = Import-Clixml -Path "$Using:Build\pester4Results.xml"
-
-        # Get module dependency scripts for -Exclude
-        $excludeScripts = (Get-ChildItem -Path $Using:ModuleDependencies -Recurse -ErrorAction SilentlyContinue).Name
-
-        Write-Output "  Running PSCodeHealth, this may take some time..."
-        $InvokePSCodeHealthParams = @{
-            Path               = $Using:Destination
-            TestsResult        = $testResults
-            Recurse            = $true
-            HtmlReportPath     = "$Using:Build\codeHealthResults.html"
-            CustomSettingsPath = "$Using:BuildTools\PSCodeHealthSettings.json"
-            Passthru           = $true
-            ErrorAction        = 'SilentlyContinue'
-        }
-        if ($excludeScripts) { $InvokePSCodeHealthParams['Exclude'] = $excludeScripts }
-
-        Write-Output "    PSCodeHealth params:`n$($InvokePSCodeHealthParams | Out-String)"
-
-        $results = Invoke-PSCodeHealth @InvokePSCodeHealthParams -Verbose:$Using:VerbosePreference
-
-        if ($results) {
-            $results | Export-Clixml -Path "$Using:Build\codeHealthResults.xml" -Depth 5
-            $pass = Test-PSCodeHealthCompliance -HealthReport $results -CustomSettingsPath "$Using:BuildTools\PSCodeHealthSettings.json"
-            if ($codeHealthWarnings = $pass | ForEach-Object { if ($_.Result -eq 'Warning') {$_} }) {
-                Write-Output "  Code health warnings:"
-                $codeHealthWarnings | Format-Table  # Formatting for output from the ps job
-            }
-
-            if ($codeHealthFailures = $pass | ForEach-Object { if ($_.Result -eq 'Fail') {$_} }) {
-                Write-Output "  Code health failures:"
-                $codeHealthFailures | Format-Table  # Formatting for output from the ps job
-            }
-        }
-
-        $functionHealthRecords = $results.FunctionHealthRecords
-        $PSScriptAnalyzerFindings = $functionHealthRecords | ForEach-Object {
-            $functionHealthRecord = $_
-            $findings = $functionHealthRecord.ScriptAnalyzerResultDetails | Where-Object { $_.Severity -match 'Warning|Error' }
-            if ($findings) {
-                $scriptName = "$($functionHealthRecord.FunctionName).ps1"
-                $findings | Add-Member -MemberType NoteProperty -Name ScriptName -Value $scriptName -Force -PassThru
-            }
-        }
-
-        if ($PSScriptAnalyzerFindings) {
-            Write-Output "  PSScriptAnalyzer findings:"
-            $PSScriptAnalyzerFindings | Format-Table  # Formatting for output from the ps job
-        }
-
-        if ($results -and -not $codeHealthFailures) {
-            Write-Output "  CodeHealth checks passed!"
-        } else {
-            throw 'PSCodeHealth tests failed!'
-        }
-    }
-    Start-Job -Name CodeHealth -Init ([ScriptBlock]::Create("Set-Location '$Script:ProjectPath'")) -ScriptBlock $scriptBlock | Receive-Job -Wait -AutoRemoveJob
-}
-
-# Synopsis: Validate the Pester code coverage against the minimum coverage
-Task CheckCodeCoverage -If ($Coverage) {
-    [xml]$test = Get-Content "$Script:Build\coverage.xml"
-    $lineCoverage = $test.report.counter | Where-Object { $_.type -eq 'LINE' }
-    $totalLines = [int]$lineCoverage.missed + [int]$lineCoverage.covered
-    $coveragePercentage = $lineCoverage.covered / $totalLines
-
-    if ($ValidateCoverage) {
-        assert ($coveragePercentage -ge $minimumCoverage) "Code coverage policy failed with $($coveragePercentage.tostring("P")) ($($lineCoverage.covered)/$totalLines lines)."
-
-        Write-Output "  Code coverage policy passed with $($coveragePercentage.tostring("P")) ($($lineCoverage.covered)/$totalLines lines)."
-    }
-}
-
-# Synopsis: Verifies if the branch that triggered this build is a valid stage (protected prerelease branch)
-Task VerifyTriggeringBranch -If (-not $prerelease) {
-    $currentCommit = git rev-parse HEAD
-    $matchingPullRequest = GetAzurePullRequest -CommitHash $currentCommit -PatToken $PatToken
-    $triggeringBranchName = $matchingPullRequest.sourceRefName -replace 'refs/heads/'
-    if ($triggeringBranchName -eq "$($Script:ModuleName)_prerelease") {
-        $Script:IsPromotion = $true
-    }
-    if ($triggeringBranchName) { Write-Output "  Triggering branch name: $triggeringBranchName"}
+    assert (-not $pesterResults.FailedCount) "There were $($pesterResults.FailedCount) Pester test failures!"
+    assert ($pesterResults.CodeCoverage.CoveragePercent -ge $pesterResults.CodeCoverage.CoveragePercentTarget) "Code coverage policy failed."
 }
 
 # Synopsis: Generate nupkg file from build
