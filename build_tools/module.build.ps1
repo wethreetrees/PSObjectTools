@@ -7,9 +7,6 @@ Param(
 # Synopsis: Runs full Build and Test process
 Task Default Build, Test
 
-# Synopsis: Run pipeline tasks
-Task Pipeline PackageModule
-
 # Synopsis: Builds the [dist] directory and prepares the module for testing and publishing
 Task Build Clean, CopyDist, GetReleasedModuleInfo, BuildPSM1, BuildPSD1
 
@@ -438,11 +435,15 @@ function GetPublicFunctionInterfaces {$function:GetPublicFunctionInterfaces}
     }
 }
 
-# Synopsis: Run the full build and test suite
-Task Test Build, Pester
+# Synopsis: Alias for Pester task
+Task Test Pester
 
 # Synopsis: Execute Pester tests
-Task Pester Build, {
+Task Pester {
+    if (-not (Test-Path -Path $Script:Destination)) {
+        throw "You must run the 'Build' task before running the test suite!`nTry this: .\build.ps1 -Task Build, Test`n Or this: .\build.ps1"
+    }
+
     Write-Output "  Setting up test dependencies"
 
     if (-not (Invoke-PSDepend -Path "$Script:BuildTools\build.Depend.psd1" -Tags Test -Test -Quiet)) {
@@ -483,33 +484,23 @@ Task Pester Build, {
     Write-Output "  Starting Pester tests"
     $pesterResults = Invoke-Pester -Configuration $configuration -Verbose:$VerbosePreference
 
-    Write-Output "  Tests completed, exporting Pester 5 results"
-    $pesterResults | Export-Clixml -Path "$Script:Build\pester5Results.xml" -Encoding UTF8 -Depth 5
-
     assert ($pesterResults) "There was a terminal error when executing the Pester tests."
     assert (-not $pesterResults.FailedCount) "There were $($pesterResults.FailedCount) Pester test failures!"
     assert ($pesterResults.CodeCoverage.CoveragePercent -ge $pesterResults.CodeCoverage.CoveragePercentTarget) "Code coverage policy failed."
 }
 
-# Synopsis: Generate nupkg file from build
-Task PackageModule Build, {
-    if ($Script:NeedsPublished) {
-        $nuspecPath = "$Script:Dist\$Script:ModuleName.nuspec"
-        . $Script:BuildTools\NewNuspecFile.ps1 -ManifestPath $Script:ManifestPath -DestinationFolder $Script:Dist
-        nuget pack $nuspecPath -OutputDirectory $Script:Dist -nopackageanalysis
+# Synopsis: Publish module, if needed
+Task Publish GetReleasedModuleInfo, {
+    if (-not (Test-Path -Path $Script:Destination)) {
+        throw "You must run the 'Build' task before publishing the module!`nTry this: .\build.ps1 -Task Build"
+    }
 
-        Write-Host "##vso[task.setvariable variable=needsPublished;isOutput=true]True"
+    $releasedModuleManifest = Import-PowerShellDataFile -Path "$($Script:ReleasedModulePath)\$ModuleName.psd1" -ErrorAction SilentlyContinue
+    $buildModuleManifest = Import-PowerShellDataFile -Path "$($Script:Destination)\$ModuleName.psd1"
 
-        $version = (Select-Xml -XPath "/package/metadata/version" -Path $nuspecPath).Node.InnerText
-        $name = (Select-Xml -XPath "/package/metadata/id" -Path $nuspecPath).Node.InnerText
-        $releaseName = "$name-$version"
-        $commitHash = git rev-parse --short HEAD
-        $buildName = "$($releaseName)_$($commitHash)"
-
-        Write-Output "ModuleVersion: $releaseName"
-        Write-Output "CommitHash: $commitHash"
-        Write-Output "Setting BuildName: [$buildName]"
-        Write-Host "##vso[build.updatebuildnumber]$buildName"
+    if ($releasedModuleManifest.ModuleVersion -lt $buildModuleManifest.ModuleVersion) {
+        Write-Output "  Publishing $($ModuleName):$($buildModuleManifest.ModuleVersion) to the PSGallery"
+        Publish-Module -Path $Script:Destination -Repository PSGallery -NuGetApiKey $env:NUGET_KEY -Verbose -WhatIf
     } else {
         Write-Output "  Build does not need to be published"
     }
@@ -521,7 +512,6 @@ Task GenerateTestFiles {
 
     $functionTypes | ForEach-Object {
         $functionType = $_
-        $private = $functionType -eq 'Private'
 
         # Get module functions
         $functionScripts = Get-ChildItem -Path "$Script:Source\$functionType" -Filter '*.ps1' -Recurse

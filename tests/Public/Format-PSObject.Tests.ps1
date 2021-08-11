@@ -1,11 +1,12 @@
 Describe "Format-PSObject Unit Tests" {
 
     BeforeAll {
-        if (Test-Path -Path $PSScriptRoot\..\dist) {
-            Import-Module $PSScriptRoot\..\dist\PSObjectTools -Force
+        $ModuleRoot = "$PSScriptRoot\..\.."
+        if (Test-Path -Path $ModuleRoot\dist) {
+            Import-Module $ModuleRoot\dist\PSObjectTools -Force
         } else {
             Write-Warning "Testing locally, importing function directly..."
-            . $PSScriptRoot\..\src\Public\Format-PSObject.ps1
+            . $ModuleRoot\src\Public\Format-PSObject.ps1
         }
     }
 
