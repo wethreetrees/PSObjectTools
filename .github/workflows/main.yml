@@ -49,8 +49,8 @@ jobs:
           name: test-results
           path: build\testResults.xml
   publish:
-    # Only publish when we are pushing to master
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+    # Only publish when we are running against the master branch
+    if: ${{ github.ref == 'refs/heads/master' }}
     name: Publish Module to PSGallery
     runs-on: ubuntu-latest
     steps:
