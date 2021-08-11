@@ -18,7 +18,7 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v2
-      - name: Perform a Pester test from the Tests.ps1 file
+      - name: Build module
         shell: pwsh
         run: .\build.ps1 -Task Build
       - name: Upload build artifact
