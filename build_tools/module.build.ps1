@@ -35,6 +35,7 @@ Enter-Build {
                 $module = Find-Module -Name $Name -Repository PSGallery -ErrorAction SilentlyContinue
                 if ($module) {
                     $module | Save-Module -Path $Path -Force
+                    $module
                 }
             } catch {
                 $PSCmdlet.ThrowTerminatingError($_)
@@ -192,7 +193,7 @@ function GetPublicFunctionInterfaces {$function:GetPublicFunctionInterfaces}
         $ScriptBlock = {
             $releasedModule = Import-Module -Name "$Using:ReleasedModulePath\$Using:ModuleName" -PassThru -Force -ErrorAction Stop
 
-            $releasedModuleManifestPath = "$Using:ReleasedModulePath\$Using:ModuleName\$Using:ModuleName.psd1"
+            $releasedModuleManifestPath = "$Using:ReleasedModulePath\$Using:ModuleName\*\$Using:ModuleName.psd1"
             $prereleaseValue = Get-ManifestValue -Path $releasedModuleManifestPath -PropertyName Prerelease
             $functionList = $releasedModule.ExportedFunctions.Values
 
