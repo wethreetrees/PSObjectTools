@@ -36,6 +36,7 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: dist
+          path: dist
       - name: Test with Pester
         shell: pwsh
         run: .\build.ps1 -Task Test -Coverage 
@@ -56,6 +57,7 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: dist
+          path: dist
       - name: Publish to PSGallery
         env:
           NUGET_KEY: ${{ secrets.NUGET_KEY }}
