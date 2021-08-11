@@ -1,0 +1,67 @@
+name: CICD
+
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+    branches: [ master ]
+    paths:
+      - src\*
+  pull_request:
+    branches: [ master ]
+    paths:
+      - src\*
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Module
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+      - name: Perform a Pester test from the command-line
+        shell: pwsh
+        run: Test-Path resultsfile.log | Should -Be $true
+      - name: Perform a Pester test from the Tests.ps1 file
+        shell: pwsh
+        run: .\build.ps1 -Task Build
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: dist
+          path: dist
+  test:
+    name: Test Module
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+      - name: Download build artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: dist
+      - name: Test with Pester
+        shell: pwsh
+        run: .\build.ps1 -Task Test -Coverage 
+      - name: Upload test results
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-results
+          path: build\testResults.xml
+  publish:
+    # Only publish when we are pushing to master
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+    name: Publish Module to PSGallery
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+      - name: Download build artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: dist
+      - name: Publish to PSGallery
+        env:
+          NUGET_KEY: ${{ secrets.NUGET_KEY }}
+        shell: pwsh
+        run: ./build.ps1 -Task Publish
