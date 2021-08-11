@@ -444,6 +444,10 @@ Task Pester {
         throw "You must run the 'Build' task before running the test suite!`nTry this: .\build.ps1 -Task Build, Test`n Or this: .\build.ps1"
     }
 
+    if (-not (Test-Path -Path $Script:Build)) {
+        New-Item -Type Directory -Path $Script:Build -ErrorAction SilentlyContinue | Out-Null
+    }
+
     Write-Output "  Setting up test dependencies"
 
     if (-not (Invoke-PSDepend -Path "$Script:BuildTools\build.Depend.psd1" -Tags Test -Test -Quiet)) {
