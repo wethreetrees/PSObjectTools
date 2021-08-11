@@ -14,14 +14,10 @@ on:
 
 jobs:
   build:
-    name: Build Module
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
         uses: actions/checkout@v2
-      - name: Perform a Pester test from the command-line
-        shell: pwsh
-        run: Test-Path resultsfile.log | Should -Be $true
       - name: Perform a Pester test from the Tests.ps1 file
         shell: pwsh
         run: .\build.ps1 -Task Build
@@ -31,7 +27,7 @@ jobs:
           name: dist
           path: dist
   test:
-    name: Test Module
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
@@ -51,7 +47,7 @@ jobs:
   publish:
     # Only publish when we are running against the master branch
     if: ${{ github.ref == 'refs/heads/master' }}
-    name: Publish Module to PSGallery
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
