@@ -25,7 +25,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: dist
-          path: dist
+          path: dist/*
   test:
     needs: build
     runs-on: ubuntu-latest
@@ -43,7 +43,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: test-results
-          path: build\testResults.xml
+          path: build\*.xml
   publish:
     # Only publish when we are running against the master branch
     if: ${{ github.ref == 'refs/heads/master' }}
