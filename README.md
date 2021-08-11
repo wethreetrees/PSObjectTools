@@ -8,14 +8,6 @@ Functions to enable advanced PSObject analysis and comparison.
 
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
 
-### Prerequisites
-
-Pester is required for running the test suite.
-
-```powershell
-Install-Module Pester -MinimumVersion 5.0.0 -Repository PSGallery
-```
-
 ### Installing
 
 This module can be installed from the (nuget.deloitteresources.com) repository. Repository setup instructions can be found on that site.
@@ -23,13 +15,7 @@ This module can be installed from the (nuget.deloitteresources.com) repository. 
 Install the latest stable release
 
 ```ps
-Install-Module -Name PSObjectTools -Repository GTIPackageRepository
-```
-
-Install the latest development release
-
-```ps
-Install-Module -Name PSObjectTools -Repository GTIPackageRepository -AllowPrerelease
+Install-Module -Name PSObjectTools -Repository PSGallery
 ```
 
 ### Basic Usage
@@ -124,4 +110,4 @@ All versioning is handled in the [build script](module.build.ps1).
 
 ## Acknowledgments
 
-
+Inspired by Phil Factor's work, as seen here: https://www.red-gate.com/simple-talk/blogs/display-object-a-powershell-utility-cmdlet/
