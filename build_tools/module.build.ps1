@@ -500,7 +500,7 @@ Task Publish GetReleasedModuleInfo, {
 
     if ($releasedModuleManifest.ModuleVersion -lt $buildModuleManifest.ModuleVersion) {
         Write-Output "  Publishing $($ModuleName):$($buildModuleManifest.ModuleVersion) to the PSGallery"
-        Publish-Module -Path $Script:Destination -Repository PSGallery -NuGetApiKey $env:NUGET_KEY -Verbose -WhatIf
+        Publish-Module -Path $Script:Destination -Repository PSGallery -NuGetApiKey $env:NUGET_KEY -Verbose
     } else {
         Write-Output "  Build does not need to be published"
     }
