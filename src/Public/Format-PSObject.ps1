@@ -60,7 +60,7 @@ function Format-PSObject {
             $Script:reachedDepthLimit = $true
         }
 
-        if ($InputObject -eq $Null) {
+        if ($null -eq $InputObject) {
             return $null
         }
 
@@ -74,7 +74,7 @@ function Format-PSObject {
             $ObjectTypeName = 'PSCustomObject'
         }
 
-        if (-not ($InputObject.Count -gt 1)) {
+        if (-not ($InputObject.Count -gt 1) -and -not ($InputObject -is [System.Collections.IEnumerable])) {
             if ($ObjectTypeName -in @('PSCustomObject')) {
                 $MemberType = 'NoteProperty'
             } else {
@@ -89,6 +89,7 @@ function Format-PSObject {
 
                     try {
                         $child = $InputObject.($property.Name)
+                        $psTypeName = try { $Child.GetType() } catch { $null }
                     } catch {
                         # Prevent crashing on write-only objects
                         $child = $null
@@ -99,10 +100,20 @@ function Format-PSObject {
                         $child.GetType().BaseType.Name -eq 'ValueType' -or
                         $child.GetType().Name -in @('String', 'String[]')
                     ) {
-                        [pscustomobject]@{ 'Path' = "$Parent.$($property.Name)"; 'Value' = $Child }
+                        [pscustomobject]@{
+                            'Path'       = "$Parent.$($property.Name)"
+                            'Value'      = $Child
+                            'PSTypeName' = $psTypeName
+                            'Depth'      = $CurrentDepth
+                        }
                     } elseif (($CurrentDepth + 1) -eq $Depth) {
                         $Script:reachedDepthLimit = $true
-                        [pscustomobject]@{ 'Path' = "$Parent.$($property.Name)"; 'Value' = $Child }
+                        [pscustomobject]@{
+                            'Path'       = "$Parent.$($property.Name)"
+                            'Value'      = $Child
+                            'PSTypeName' = $psTypeName
+                            'Depth'      = $CurrentDepth
+                        }
                     } else {
                         $FormatPSObjectParams = @{
                             InputObject    = $child
@@ -119,16 +130,27 @@ function Format-PSObject {
             0..($InputObject.Count - 1) | ForEach-Object {
                 $iterator = $_
                 $child = $InputObject[$iterator]
+                $psTypeName = try { $Child.GetType() } catch { $null }
 
                 if (
                     ($null -eq $child) -or #is the current child a value or a null?
                     ($child.GetType().BaseType.Name -eq 'ValueType') -or
                     ($child.GetType().Name -in @('String', 'String[]'))
                 ) {
-                    [pscustomobject]@{ 'Path' = "$Parent[$iterator]"; 'Value' = "$($child)" }
+                    [pscustomobject]@{
+                        'Path'       = "$Parent[$iterator]"
+                        'Value'      = "$child"
+                        'PSTypeName' = $psTypeName
+                        'Depth'      = $CurrentDepth
+                    }
                 } elseif (($CurrentDepth + 1) -eq $Depth) {
                     $Script:reachedDepthLimit = $true
-                    [pscustomobject]@{ 'Path' = "$Parent[$iterator]"; 'Value' = "$($child)" }
+                    [pscustomobject]@{
+                        'Path'       = "$Parent[$iterator]"
+                        'Value'      = "$child"
+                        'PSTypeName' = $psTypeName
+                        'Depth'      = $CurrentDepth
+                    }
                 } else {
                     $FormatPSObjectParams = @{
                         InputObject    = $child
