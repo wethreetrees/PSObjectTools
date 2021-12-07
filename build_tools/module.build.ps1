@@ -4,6 +4,8 @@ Param(
     [double]$MinimumCoverage
 )
 
+# import tasks from module - specify version
+
 # Synopsis: Runs full Build and Test process
 Task Default Build, Test
 
@@ -103,11 +105,19 @@ Enter-Build {
         )
         $Exclude = $Exclude | ForEach-Object { $_ -replace '\\','\\' }
         $ReferenceHashes = Get-ChildItem -Path "$ReferenceFolder" -Recurse |
-            Where-Object { $_.FullName -notmatch ($Exclude -join '|') } |
-            Get-FileHash
+            Where-Object { $_.FullName -notmatch ($Exclude -join '|') -and $_ -is [System.IO.FileInfo] } |
+            ForEach-Object {
+                $content = Get-Content $_.FullName
+                $content | Set-Content $_.FullName
+                $_.FullName
+            } | ForEach-Object { Get-FileHash -Path $_ }
         $DifferenceHashes = Get-ChildItem -Path "$DifferenceFolder" -Recurse -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -notmatch ($Exclude -join '|') } |
-            Get-FileHash
+            Where-Object { $_.FullName -notmatch ($Exclude -join '|') -and $_ -is [System.IO.FileInfo] } |
+            ForEach-Object {
+                $content = Get-Content $_.FullName
+                $content | Set-Content $_.FullName
+                $_.FullName
+            } | ForEach-Object { Get-FileHash -Path $_ }
         $files = $ReferenceHashes + $DifferenceHashes
 
         foreach ($ReferenceHash in $ReferenceHashes) {
@@ -118,8 +128,8 @@ Enter-Build {
                 }
             }
         }
-
-        $files | ForEach-Object { ($_.Path -split '\\')[-1] } | Select-Object -Unique
+    
+        $files | ForEach-Object { ($_.Path -split '\\')[-1] } | Sort-Object -Unique
     }
 
     $Script:ProjectPath = Split-Path -Path $PSScriptRoot -Parent -Resolve
@@ -416,13 +426,13 @@ function GetPublicFunctionInterfaces {$function:GetPublicFunctionInterfaces}
         $relativeManifestPath = "$Script:Source\$Script:ModuleName.psd1" | Resolve-Path -Relative
         Write-Output "  Detected manual version increment, using version from $($relativeManifestPath): [$version]"
         $Script:NeedsPublished = $true
-    } elseif (-not $Prerelease -and $releaseIsPrerelease -and -not $VersionIncrement) {
+    } elseif (-not $Prerelease -and $releaseIsPrerelease -and -not $DetectedVersionIncrement) {
         $version = $releasedVersion
         Write-Output "  Promoting [$version] to release!"
         $Script:NeedsPublished = $true
-    } elseif ($VersionIncrement) {
-        $version = [Version](Step-Version -Version $releasedVersion -By $VersionIncrement)
-        Write-Output "  Stepping module from released version [$releasedVersion] to new version [$version] by [$VersionIncrement] revision"
+    } elseif ($DetectedVersionIncrement) {
+        $version = [Version](Step-Version -Version $releasedVersion -By $DetectedVersionIncrement)
+        Write-Output "  Stepping module from released version [$releasedVersion] to new version [$version] by [$DetectedVersionIncrement] revision"
         $Script:NeedsPublished = $true
     } else {
         Write-Output "No changes detected, using version from released version [$releasedVersion]"
