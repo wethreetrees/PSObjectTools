@@ -330,7 +330,7 @@ function GetPublicFunctionInterfaces {$function:GetPublicFunctionInterfaces}
 "@)
         $scriptBlock = {
             # Detecting ReleasedModule Functions
-            $releasedModuleManifestPath = "$Using:ReleasedModulePath\$Using:ModuleName\$Using:ModuleName.psd1"
+            $releasedModuleManifestPath = "$Using:ReleasedModulePath\$Using:ModuleName"
 
             if (Test-Path -Path $releasedModuleManifestPath) {
                 $oldFunctionList = (Import-Module -Name "$releasedModuleManifestPath" -Force -PassThru).ExportedFunctions.Values

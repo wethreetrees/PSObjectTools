@@ -39,6 +39,27 @@ BeforeDiscovery {
             )
         }
     )
+
+    $noDifferenceTestCases = @(
+        @{
+            ReferenceObject = [pscustomobject]@{
+                Name = 'ObjectName'
+            }
+            DifferenceObject = [pscustomobject]@{
+                Name = 'ObjectName'
+            }
+        },
+        @{
+            ReferenceObject = [pscustomobject]@{
+                Name = 'ObjectName'
+                TestProperty = 'string', 'array', 'values'
+            }
+            DifferenceObject = [pscustomobject]@{
+                Name = 'ObjectName'
+                TestProperty = 'string', 'array', 'values'
+            }
+        }
+    )
 }
 
 Describe "Compare-PSObject Unit Tests" {
@@ -93,7 +114,10 @@ Describe "Compare-PSObject Unit Tests" {
 
     Context "Identical Objects" {
 
-
+        It "Should not return any differences" -TestCases $noDifferenceTestCases {
+            $result = Compare-PSObject -ReferenceObject $ReferenceObject -DifferenceObject $DifferenceObject
+            $result | Should -BeNullOrEmpty
+        }
 
     }
 
@@ -115,6 +139,104 @@ Describe "Compare-PSObject Unit Tests" {
     Context "Differences Beyond Depth Limit" {
 
 
+
+    }
+
+    Context "Array Differences" {
+
+        It "Should return diffs when out of order" {
+            $ReferenceObject = [pscustomobject]@{
+                List = @(1, 2, 3, 4, 5)
+            }
+            $DifferenceObject = [pscustomobject]@{
+                List = @(5, 1, 2, 3, 4)
+            }
+            $ExpectedValue = @(
+                [pscustomobject]@{
+                    Property        = '$_.List[0]'
+                    ReferenceValue  = 1
+                    DifferenceValue = 5
+                    Indicator      = 'NotEqual'
+                },
+                [pscustomobject]@{
+                    Property        = '$_.List[1]'
+                    ReferenceValue  = 2
+                    DifferenceValue = 1
+                    Indicator      = 'NotEqual'
+                },
+                [pscustomobject]@{
+                    Property        = '$_.List[2]'
+                    ReferenceValue  = 3
+                    DifferenceValue = 2
+                    Indicator      = 'NotEqual'
+                },
+                [pscustomobject]@{
+                    Property        = '$_.List[3]'
+                    ReferenceValue  = 4
+                    DifferenceValue = 3
+                    Indicator      = 'NotEqual'
+                },
+                [pscustomobject]@{
+                    Property        = '$_.List[4]'
+                    ReferenceValue  = 5
+                    DifferenceValue = 4
+                    Indicator      = 'NotEqual'
+                }
+            )
+
+            $result = Compare-PSObject -ReferenceObject $ReferenceObject -DifferenceObject $DifferenceObject
+            $result | Should -BeObject $ExpectedValue
+        }
+
+        It "Should return diffs when missing array item" {
+            $ReferenceObject = [pscustomobject]@{
+                List = @(1, 2, 3, 4, 5)
+            }
+            $DifferenceObject = [pscustomobject]@{
+                List = @(1, 2, 3, 4)
+            }
+            $ExpectedValue = @(
+                [pscustomobject]@{
+                    Property        = '$_.List[4]'
+                    ReferenceValue  = 5
+                    DifferenceValue = $null
+                    Indicator      = 'NotEqual'
+                }
+            )
+
+            $result = Compare-PSObject -ReferenceObject $ReferenceObject -DifferenceObject $DifferenceObject
+            $result | Should -BeObject $ExpectedValue
+        }
+
+        It "Should not return diff when out of order, with '-MergeArrays'" {
+            $ReferenceObject = [pscustomobject]@{
+                List = @(1, 2, 3, 4, 5)
+            }
+            $DifferenceObject = [pscustomobject]@{
+                List = @(5, 1, 2, 3, 4)
+            }
+
+            $result = Compare-PSObject -ReferenceObject $ReferenceObject -DifferenceObject $DifferenceObject -MergeArrays
+            $result | Should -BeNullOrEmpty
+        }
+
+        It "Should return diff when missing array item, with '-MergeArrays'" {
+            $ReferenceObject = [pscustomobject]@{
+                List = @(1, 2, 3, 4, 5)
+            }
+            $DifferenceObject = [pscustomobject]@{
+                List = @(1, 2, 3, 4)
+            }
+            $ExpectedValue = [pscustomobject]@{
+                Property        = '$_.List'
+                ReferenceValue  = @(1, 2, 3, 4, 5)
+                DifferenceValue = @(1, 2, 3, 4)
+                Indicator      = 'NotEqual'
+            }
+
+            $result = Compare-PSObject -ReferenceObject $ReferenceObject -DifferenceObject $DifferenceObject -MergeArrays
+            $result | Should -BeObject $ExpectedValue
+        }
 
     }
 

@@ -16,6 +16,9 @@
     .PARAMETER IgnoreProperty
         An array of property names to skip formatting
 
+    .PARAMETER MergeArrays
+        Uses array values directly, instead of expanding the contents and index of the individual array items
+
     .PARAMETER Parent
         For internal use, but you can specify the base name of the variable displayed in the path
 
@@ -42,6 +45,9 @@ function Format-PSObject {
 
         [Parameter()]
         [string[]]$IgnoreProperty,
+
+        [Parameter()]
+        [switch]$MergeArrays,
 
         [Parameter(DontShow)]
         [string]$Parent = '$_',
@@ -74,7 +80,7 @@ function Format-PSObject {
             $ObjectTypeName = 'PSCustomObject'
         }
 
-        if (-not ($InputObject.Count -gt 1) -and -not ($InputObject -is [System.Collections.IEnumerable])) {
+        if (-not ($InputObject.Count -gt 1) -and (-not ($InputObject -is [System.Collections.IEnumerable]))) {
             if ($ObjectTypeName -in @('PSCustomObject')) {
                 $MemberType = 'NoteProperty'
             } else {
@@ -121,45 +127,56 @@ function Format-PSObject {
                             IgnoreProperty = $IgnoreProperty
                             Parent         = "$Parent.$($property.Name)"
                             CurrentDepth   = $currentDepth + 1
+                            MergeArrays    = $MergeArrays
                         }
                         Format-PSObject @FormatPSObjectParams
                     }
                 }
             }
         } else {
-            0..($InputObject.Count - 1) | ForEach-Object {
-                $iterator = $_
-                $child = $InputObject[$iterator]
+            if ($MergeArrays) {
                 $psTypeName = try { $Child.GetType() } catch { $null }
+                [pscustomobject]@{
+                    'Path'       = "$Parent"
+                    'Value'      = $InputObject | Sort-Object
+                    'PSTypeName' = $psTypeName
+                    'Depth'      = $CurrentDepth
+                }
+            } else {
+                0..($InputObject.Count - 1) | ForEach-Object {
+                    $iterator = $_
+                    $child = $InputObject[$iterator]
+                    $psTypeName = try { $Child.GetType() } catch { $null }
 
-                if (
-                    ($null -eq $child) -or #is the current child a value or a null?
-                    ($child.GetType().BaseType.Name -eq 'ValueType') -or
-                    ($child.GetType().Name -in @('String', 'String[]'))
-                ) {
-                    [pscustomobject]@{
-                        'Path'       = "$Parent[$iterator]"
-                        'Value'      = "$child"
-                        'PSTypeName' = $psTypeName
-                        'Depth'      = $CurrentDepth
+                    if (
+                        ($null -eq $child) -or #is the current child a value or a null?
+                        ($child.GetType().BaseType.Name -eq 'ValueType') -or
+                        ($child.GetType().Name -in @('String', 'String[]'))
+                    ) {
+                        [pscustomobject]@{
+                            'Path'       = "$Parent[$iterator]"
+                            'Value'      = "$child"
+                            'PSTypeName' = $psTypeName
+                            'Depth'      = $CurrentDepth
+                        }
+                    } elseif (($CurrentDepth + 1) -eq $Depth) {
+                        $Script:reachedDepthLimit = $true
+                        [pscustomobject]@{
+                            'Path'       = "$Parent[$iterator]"
+                            'Value'      = "$child"
+                            'PSTypeName' = $psTypeName
+                            'Depth'      = $CurrentDepth
+                        }
+                    } else {
+                        $FormatPSObjectParams = @{
+                            InputObject    = $child
+                            depth          = $Depth
+                            IgnoreProperty = $IgnoreProperty
+                            Parent         = "$Parent[$iterator]"
+                            CurrentDepth   = $currentDepth + 1
+                        }
+                        Format-PSObject @FormatPSObjectParams
                     }
-                } elseif (($CurrentDepth + 1) -eq $Depth) {
-                    $Script:reachedDepthLimit = $true
-                    [pscustomobject]@{
-                        'Path'       = "$Parent[$iterator]"
-                        'Value'      = "$child"
-                        'PSTypeName' = $psTypeName
-                        'Depth'      = $CurrentDepth
-                    }
-                } else {
-                    $FormatPSObjectParams = @{
-                        InputObject    = $child
-                        depth          = $Depth
-                        IgnoreProperty = $IgnoreProperty
-                        Parent         = "$Parent[$iterator]"
-                        CurrentDepth   = $currentDepth + 1
-                    }
-                    Format-PSObject @FormatPSObjectParams
                 }
             }
         }
