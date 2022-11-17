@@ -33,6 +33,9 @@
     .PARAMETER ExcludeDifferent
         Exclude differing properties in the returned dataset
 
+    .PARAMETER MergeArrays
+        Compare arrays as individual units, instead of expanding and comparing the index and contents of each item in the array
+
     .EXAMPLE
         Compare-PSObject -ReferenceObject @{value1 = 'testvalue'} -DifferenceObject @{value1 = 'testvalue'}
 
@@ -57,7 +60,10 @@ function Compare-PSObject {
         [switch]$IncludeEqual,
 
         [Parameter()]
-        [switch]$ExcludeDifferent
+        [switch]$ExcludeDifferent,
+
+        [Parameter()]
+        [switch]$MergeArrays
     )
 
     process {
@@ -65,8 +71,8 @@ function Compare-PSObject {
         if ($IgnoreProperty) { $formatObjectParams['IgnoreProperty'] = $IgnoreProperty }
         if ($Depth) { $formatObjectParams['Depth'] = $Depth }
 
-        $ReferenceObjectFormatted = $ReferenceObject | Format-PSObject @formatObjectParams
-        $DifferenceObjectFormatted = $DifferenceObject | Format-PSObject @formatObjectParams
+        $ReferenceObjectFormatted = $ReferenceObject | Format-PSObject @formatObjectParams -MergeArrays:$MergeArrays
+        $DifferenceObjectFormatted = $DifferenceObject | Format-PSObject @formatObjectParams -MergeArrays:$MergeArrays
 
         $CompareObjectParams = @{
             ReferenceObject  = $ReferenceObjectFormatted

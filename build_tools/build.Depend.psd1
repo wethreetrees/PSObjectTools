@@ -14,27 +14,27 @@
         Version = '5.6.3'
         Tags    = 'Build', 'CodeHealth'
     }
-    Pester_5_0_4          = @{
+    Pester         = @{
         Name    = 'Pester'
-        Version = '5.2.2'
+        Version = '5.3.1'
         Tags    = 'Test'
         Target  = '$DependencyFolder\_build_dependencies_\Test\'
     }
-    Pester_4_10_1         = @{
-        Name    = 'Pester'
-        Version = '4.10.1'
-        Tags    = 'CodeHealth'
-        Target  = '$DependencyFolder\_build_dependencies_\CodeHealth\'
-    }
+    # Pester_4_10_1         = @{
+    #     Name    = 'Pester'
+    #     Version = '4.10.1'
+    #     Tags    = 'CodeHealth'
+    #     Target  = '$DependencyFolder\_build_dependencies_\CodeHealth\'
+    # }
     PSScriptAnalyzer      = @{
         Version = '1.19.1'
         Tags    = 'CodeHealth'
         Target  = '$DependencyFolder\_build_dependencies_\CodeHealth\'
     }
-    PSCodeHealth          = @{
-        Version        = '0.2.26'
-        Tags           = 'CodeHealth'
-        Target         = '$DependencyFolder\_build_dependencies_\CodeHealth\'
-        DependsOn      = 'Pester_4_10_1'
-    }
+    # PSCodeHealth          = @{
+    #     Version        = '0.2.26'
+    #     Tags           = 'CodeHealth'
+    #     Target         = '$DependencyFolder\_build_dependencies_\CodeHealth\'
+    #     DependsOn      = 'Pester_4_10_1'
+    # }
 }
