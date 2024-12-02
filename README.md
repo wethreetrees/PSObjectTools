@@ -10,8 +10,6 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Installing
 
-This module can be installed from the (nuget.deloitteresources.com) repository. Repository setup instructions can be found on that site.
-
 Install the latest stable release
 
 ```ps
